@@ -253,26 +253,23 @@ func FilterHostForSpec(spec *v3.RancherKubernetesEngineConfig, n *v3.Node) {
 
 func AugmentProcesses(token string, processes map[string]v3.Process, worker, b2d bool, nodeName string,
 	cluster *v3.Cluster) map[string]v3.Process {
-	var shared []string
+	var shared bool
 
-	if b2d {
-		shared = append(shared, b2Mount)
-	}
-
+OuterLoop:
 	for _, process := range processes {
 		for _, bind := range process.Binds {
 			parts := strings.Split(bind, ":")
 			if len(parts) > 2 && strings.Contains(parts[2], "shared") {
-				shared = append(shared, parts[0])
+				shared = true
+				break OuterLoop
 			}
 		}
 	}
 
-	if len(shared) > 0 {
+	if shared {
 		agentImage := settings.AgentImage.Get()
 		nodeCommand := clusterregistrationtokens.NodeCommand(token, cluster) + " --no-register --only-write-certs --node-name " + nodeName
 		args := []string{"--", "share-root.sh", strings.TrimPrefix(nodeCommand, "sudo ")}
-		args = append(args, shared...)
 		privateRegistryConfig, _ := util.GenerateClusterPrivateRegistryDockerConfig(cluster)
 		processes["share-mnt"] = v3.Process{
 			Name:                    "share-mnt",
